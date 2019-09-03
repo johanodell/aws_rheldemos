@@ -1,0 +1,118 @@
+---
+# Provision instances in AWS specific to the LAMP HA Proxy demo
+- name: Provision RHEL8 instances in AWS
+  hosts: localhost
+  connection: local
+  gather_facts: False
+
+  # load AWS variables from this group vars file
+  vars_files:
+  - group_vars/all
+
+  tasks:
+  - name: Ensure the "{{ ec2_security_group }}" security group is in place
+    ec2_group:
+      name: "{{ ec2_security_group }}"
+      description: Demo security group
+      region: "{{ ec2_region }}"
+      aws_access_key: "{{ ec2_access_key }}"
+      aws_secret_key: "{{ ec2_secret_key}}"
+      rules:
+        - proto: tcp
+          from_port: 22
+          to_port: 22
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 80
+          to_port: 80
+          cidr_ip: 0.0.0.0/0
+        - proto: tcp
+          from_port: 9090
+          to_port: 9090
+          cidr_ip: 0.0.0.0/0
+      rules_egress:
+        - proto: all
+          cidr_ip: 0.0.0.0/0
+
+  - name: Launch instances
+    ec2:
+      access_key: "{{ ec2_access_key }}"
+      secret_key: "{{ ec2_secret_key }}"
+      keypair: "{{ ec2_keypair }}"
+      group: "{{ ec2_security_group }}"
+      type: "{{ ec2_instance_type }}"
+      image: "{{ ec2_image }}"
+      region: "{{ ec2_region }}"
+      instance_tags: "{'ansible_group':'app', 'type':'{{ ec2_instance_type }}', 'group':'{{ ec2_security_group }}', 'Name':'app_server_''{{ tower_user_name }}'}"
+      count: "{{ ec2_instance_count }}"
+      wait: true
+    register: ec2
+
+  - name: Wait for SSH to come up
+    wait_for:
+      host: "{{ item.public_dns_name }}"
+      port: 22
+      delay: 60
+      timeout: 320
+      state: started
+    with_items: "{{ ec2.instances }}"
+
+  - name: Setup in-memory inventory
+    add_host:
+      name: "{{ item.public_dns_name }}"
+      groups:
+        - tag_ansible_group_app
+    with_items: "{{ ec2.instances }}"
+
+- name: "[Play 2] Post Configuration of VM"
+  hosts: tag_ansible_group_app
+  become: true
+  vars:
+    ansible_python_interpreter: /usr/libexec/platform-python
+
+  tasks:
+    - name: Set hostname for system
+      hostname:
+        name: "{{ 'aws' + '-' + ansible_hostname }}"
+
+    - name: Register system w RHSM
+      shell: subscription-manager register --force --username="{{ rhsm_user }}" --password="{{ rhsm_password }}"
+
+    - name: Attach Pool
+      shell: subscription-manager attach --pool="{{ rhsm_pool_id }}"
+
+    - name: Disable all RHSM repositories
+      rhsm_repository:
+        name: '*'
+        state: disabled
+
+    - name: Enable RHSM repositories
+      rhsm_repository:
+        name: "{{ item }}"
+      with_items: "{{ rhsm_repos }}"
+
+    - name: Install insights and register system
+      include_role:
+        name: redhatinsights.insights-client
+      #  insights_display_name: "{{ inventory_hostname }}"
+
+    - name: Install Cockpit
+      yum:
+        name: cockpit
+        state: latest
+
+    - name: Make sure required services are enabled and started
+      service:
+        name: cockpit
+        enabled: true
+        state: started
+
+    - name: Configure Firewalld to allow cockpit
+      firewalld:
+        service: cockpit
+        permanent: true
+        state: enabled
+        immediate: yes
+
+    - name: test
+      command: ls
