@@ -1,6 +1,6 @@
 ---
 # Provision instances in AWS
-- name: Provision RHEL8 instances in AWS
+- name: "[Play 1] Provision RHEL8 instances in AWS"
   hosts: localhost
   connection: local
   gather_facts: False
@@ -75,11 +75,12 @@
       hostname:
         name: "{{ 'aws' + '-' + ansible_hostname }}"
 
-    - name: Register system w RHSM
-      shell: subscription-manager register --force --username="{{ rhsm_user }}" --password="{{ rhsm_password }}"
-
-    - name: Attach Pool
-      shell: subscription-manager attach --pool="{{ rhsm_pool_id }}"
+    - name: Register systems and add pools
+      redhat_subscription:
+        state: present
+        username: "{{ rhsm_user }}"
+        password: "{{ rhsm_password }}"
+        pool_ids: "{{ rhsm_pool_id }}"
 
     - name: Disable all RHSM repositories
       rhsm_repository:
