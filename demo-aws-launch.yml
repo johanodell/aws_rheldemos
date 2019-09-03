@@ -1,5 +1,5 @@
 ---
-# Provision instances in AWS specific to the LAMP HA Proxy demo
+# Provision instances in AWS
 - name: Provision RHEL8 instances in AWS
   hosts: localhost
   connection: local
