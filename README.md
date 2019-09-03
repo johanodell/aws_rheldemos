@@ -1,3 +1,3 @@
 # aws_rheldemos
 
-Ansible playbooks RHEL and mgmt demos in AWS. 
+Ansible playbooks for RHEL and mgmt demos in AWS. 
