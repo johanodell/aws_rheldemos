@@ -1,5 +1,4 @@
 ---
-# Provision instances in AWS
 - name: "[Play 1] Provision RHEL8 instances in AWS"
   hosts: localhost
   connection: local
