@@ -14,7 +14,7 @@ ec2_image:
 ec2_instance_type:
 ec2_keypair:
 ec2_security_group:
-#ec2_instance_count: 3
+ec2_instance_count: 
 ec2_tag:
 ec2_tag_name_prefix:
 ec2_hosts:
